@@ -1,4 +1,4 @@
-pragma solidity 0.4.18;
+pragma solidity 0.4.19;
 
 // ================= Ownable Contract start =============================
 /*
@@ -72,25 +72,17 @@ contract ERC20 {
 // ================= Standard Token Contract start ======================
 contract StandardToken is ERC20, SafeMath {
 
-  /**
-  * @dev Fix for the ERC20 short address attack.
-   */
-  modifier onlyPayloadSize(uint size) {
-    require(msg.data.length >= size + 4) ;
-    _;
-  }
-
   mapping(address => uint) balances;
   mapping (address => mapping (address => uint)) allowed;
 
-  function transfer(address _to, uint _value) onlyPayloadSize(2 * 32)  returns (bool success){
+  function transfer(address _to, uint _value) returns (bool success){
     balances[msg.sender] = safeSubtract(balances[msg.sender], _value);
     balances[_to] = safeAdd(balances[_to], _value);
     Transfer(msg.sender, _to, _value);
     return true;
   }
 
-  function transferFrom(address _from, address _to, uint _value) onlyPayloadSize(3 * 32) returns (bool success) {
+  function transferFrom(address _from, address _to, uint _value) returns (bool success) {
     var _allowance = allowed[_from][msg.sender];
 
     balances[_to] = safeAdd(balances[_to], _value);
