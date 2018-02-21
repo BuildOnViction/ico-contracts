@@ -10,7 +10,7 @@ pragma solidity 0.4.19;
 contract Ownable {
   address public owner;
 
-  function Ownable() {
+  function Ownable() public {
     owner = msg.sender;
   }
 
@@ -19,7 +19,7 @@ contract Ownable {
     _;
   }
 
-  function transferOwnership(address newOwner) onlyOwner {
+  function transferOwnership(address newOwner) public onlyOwner {
     if (newOwner != address(0)) {
       owner = newOwner;
     }
@@ -27,29 +27,49 @@ contract Ownable {
 }
 // ================= Ownable Contract end ===============================
 
-// ================= Safemath Contract start ============================
-/* taking ideas from FirstBlood token */
-contract SafeMath {
+// ================= Safemath Lib ============================
+library SafeMath {
 
-  function safeAdd(uint256 x, uint256 y) internal returns(uint256) {
-    uint256 z = x + y;
-    assert((z >= x) && (z >= y));
-    return z;
+  /**
+  * @dev Multiplies two numbers, throws on overflow.
+  */
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
+    }
+    uint256 c = a * b;
+    assert(c / a == b);
+    return c;
   }
 
-  function safeSubtract(uint256 x, uint256 y) internal returns(uint256) {
-    assert(x >= y);
-    uint256 z = x - y;
-    return z;
+  /**
+  * @dev Integer division of two numbers, truncating the quotient.
+  */
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
   }
 
-  function safeMult(uint256 x, uint256 y) internal returns(uint256) {
-    uint256 z = x * y;
-    assert((x == 0)||(z/x == y));
-    return z;
+  /**
+  * @dev Substracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
+  */
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  /**
+  * @dev Adds two numbers, throws on overflow.
+  */
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
   }
 }
-// ================= Safemath Contract end ==============================
+// ================= Safemath Lib end ==============================
 
 // ================= ERC20 Token Contract start =========================
 /*
@@ -57,53 +77,138 @@ contract SafeMath {
  * see https://github.com/ethereum/EIPs/issues/20
  */
 contract ERC20 {
-  uint public totalSupply;
-  function balanceOf(address who) constant returns (uint);
-  function allowance(address owner, address spender) constant returns (uint);
-
-  function transfer(address to, uint value) returns (bool ok);
-  function transferFrom(address from, address to, uint value) returns (bool ok);
-  function approve(address spender, uint value) returns (bool ok);
-  event Transfer(address indexed from, address indexed to, uint value);
-  event Approval(address indexed owner, address indexed spender, uint value);
+  function totalSupply() public view returns (uint256);
+  function balanceOf(address who) public view returns (uint256);
+  function transfer(address to, uint256 value) public returns (bool);
+  function allowance(address owner, address spender) public view returns (uint256);
+  function transferFrom(address from, address to, uint256 value) public returns (bool);
+  function approve(address spender, uint256 value) public returns (bool);
+  event Transfer(address indexed from, address indexed to, uint256 value);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 // ================= ERC20 Token Contract end ===========================
 
 // ================= Standard Token Contract start ======================
-contract StandardToken is ERC20, SafeMath {
+contract StandardToken is ERC20 {
+  using SafeMath for uint256;
 
-  mapping(address => uint) balances;
-  mapping (address => mapping (address => uint)) allowed;
+  mapping(address => uint256) balances;
+  mapping (address => mapping (address => uint256)) internal allowed;
 
-  function transfer(address _to, uint _value) returns (bool success){
-    balances[msg.sender] = safeSubtract(balances[msg.sender], _value);
-    balances[_to] = safeAdd(balances[_to], _value);
+  uint256 totalSupply_;
+
+  /**
+  * @dev total number of tokens in existence
+  */
+  function totalSupply() public view returns (uint256) {
+    return totalSupply_;
+  }
+
+  /**
+  * @dev transfer token for a specified address
+  * @param _to The address to transfer to.
+  * @param _value The amount to be transferred.
+  */
+  function transfer(address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[msg.sender]);
+
+    // SafeMath.sub will throw if there is not enough balance.
+    balances[msg.sender] = balances[msg.sender].sub(_value);
+    balances[_to] = balances[_to].add(_value);
     Transfer(msg.sender, _to, _value);
     return true;
   }
 
-  function transferFrom(address _from, address _to, uint _value) returns (bool success) {
-    var _allowance = allowed[_from][msg.sender];
+  /**
+  * @dev Gets the balance of the specified address.
+  * @param _owner The address to query the the balance of.
+  * @return An uint256 representing the amount owned by the passed address.
+  */
+  function balanceOf(address _owner) public view returns (uint256 balance) {
+    return balances[_owner];
+  }
 
-    balances[_to] = safeAdd(balances[_to], _value);
-    balances[_from] = safeSubtract(balances[_from], _value);
-    allowed[_from][msg.sender] = safeSubtract(_allowance, _value);
+
+  /**
+   * @dev Transfer tokens from one address to another
+   * @param _from address The address which you want to send tokens from
+   * @param _to address The address which you want to transfer to
+   * @param _value uint256 the amount of tokens to be transferred
+   */
+  function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[_from]);
+    require(_value <= allowed[_from][msg.sender]);
+
+    balances[_from] = balances[_from].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
     Transfer(_from, _to, _value);
     return true;
   }
 
-  function balanceOf(address _owner) constant returns (uint balance) {
-    return balances[_owner];
-  }
-
-  function approve(address _spender, uint _value) returns (bool success) {
+  /**
+   * @dev Approve the passed address to spend the specified amount of tokens on behalf of msg.sender.
+   *
+   * Beware that changing an allowance with this method brings the risk that someone may use both the old
+   * and the new allowance by unfortunate transaction ordering. One possible solution to mitigate this
+   * race condition is to first reduce the spender's allowance to 0 and set the desired value afterwards:
+   * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+   * @param _spender The address which will spend the funds.
+   * @param _value The amount of tokens to be spent.
+   */
+  function approve(address _spender, uint256 _value) public returns (bool) {
     allowed[msg.sender][_spender] = _value;
     Approval(msg.sender, _spender, _value);
     return true;
   }
 
-  function allowance(address _owner, address _spender) constant returns (uint remaining) {
+  /**
+   * @dev Function to check the amount of tokens that an owner allowed to a spender.
+   * @param _owner address The address which owns the funds.
+   * @param _spender address The address which will spend the funds.
+   * @return A uint256 specifying the amount of tokens still available for the spender.
+   */
+  function allowance(address _owner, address _spender) public view returns (uint256) {
     return allowed[_owner][_spender];
+  }
+
+  /**
+   * @dev Increase the amount of tokens that an owner allowed to a spender.
+   *
+   * approve should be called when allowed[_spender] == 0. To increment
+   * allowed value is better to use this function to avoid 2 calls (and wait until
+   * the first transaction is mined)
+   * From MonolithDAO Token.sol
+   * @param _spender The address which will spend the funds.
+   * @param _addedValue The amount of tokens to increase the allowance by.
+   */
+  function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
+    allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
+    Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+    return true;
+  }
+
+  /**
+   * @dev Decrease the amount of tokens that an owner allowed to a spender.
+   *
+   * approve should be called when allowed[_spender] == 0. To decrement
+   * allowed value is better to use this function to avoid 2 calls (and wait until
+   * the first transaction is mined)
+   * From MonolithDAO Token.sol
+   * @param _spender The address which will spend the funds.
+   * @param _subtractedValue The amount of tokens to decrease the allowance by.
+   */
+  function decreaseApproval(address _spender, uint _subtractedValue) public returns (bool) {
+    uint oldValue = allowed[msg.sender][_spender];
+    if (_subtractedValue > oldValue) {
+      allowed[msg.sender][_spender] = 0;
+    } else {
+      allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
+    }
+    Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+    return true;
   }
 }
 // ================= Standard Token Contract end ========================
@@ -139,7 +244,7 @@ contract Pausable is Ownable {
   /**
   * @dev called by the owner to pause, triggers stopped state
   */
-  function pause() onlyOwner whenNotPaused returns (bool) {
+  function pause() public onlyOwner whenNotPaused returns (bool) {
     paused = true;
     Pause();
     return true;
@@ -148,7 +253,7 @@ contract Pausable is Ownable {
   /**
   * @dev called by the owner to unpause, returns to normal state
   */
-  function unpause() onlyOwner whenPaused returns (bool) {
+  function unpause() public onlyOwner whenPaused returns (bool) {
     paused = false;
     Unpause();
     return true;
@@ -157,7 +262,7 @@ contract Pausable is Ownable {
 // ================= Pausable Token Contract end ========================
 
 // ================= Tomocoin  start =======================
-contract TomoCoin is SafeMath, StandardToken, Pausable {
+contract TomoCoin is StandardToken, Pausable {
   string public constant name = 'Tomocoin';
   string public constant symbol = 'TOMO';
   uint256 public constant decimals = 18;
@@ -166,40 +271,40 @@ contract TomoCoin is SafeMath, StandardToken, Pausable {
 
   uint256 public constant tomoDeposit = 100000000 * 10**decimals;
 
-  function TomoCoin(address _tomoDepositAddress) { 
+  function TomoCoin(address _tomoDepositAddress) public { 
     tomoDepositAddress = _tomoDepositAddress;
 
     balances[tomoDepositAddress] = tomoDeposit;
     Transfer(0x0, tomoDepositAddress, tomoDeposit);
-    totalSupply = tomoDeposit;
+    totalSupply_ = tomoDeposit;
   }
 
-  function transfer(address _to, uint _value) whenNotPaused returns (bool success) {
+  function transfer(address _to, uint _value) public whenNotPaused returns (bool success) {
     return super.transfer(_to,_value);
   }
 
-  function approve(address _spender, uint _value) whenNotPaused returns (bool success) {
+  function approve(address _spender, uint _value) public whenNotPaused returns (bool success) {
     return super.approve(_spender,_value);
   }
 
-  function balanceOf(address _owner) constant returns (uint balance) {
+  function balanceOf(address _owner) public view returns (uint balance) {
     return super.balanceOf(_owner);
   }
 
   // Setup Token Sale Smart Contract
-  function setTokenSaleAddress(address _tokenSaleAddress) onlyOwner {
+  function setTokenSaleAddress(address _tokenSaleAddress) public onlyOwner {
     if (_tokenSaleAddress != address(0)) {
       tokenSaleAddress = _tokenSaleAddress;
     }
   }
 
-  function mint(address _recipient, uint _value) whenNotPaused returns (bool success) {
-      assert(_value > 0);
+  function mint(address _recipient, uint _value) public whenNotPaused returns (bool success) {
+      require(_value > 0);
       // This function is only called by Token Sale Smart Contract
       require(msg.sender == tokenSaleAddress);
 
-      balances[tomoDepositAddress] = safeSubtract(balances[tomoDepositAddress], _value);
-      balances[ _recipient ] = safeAdd(balances[_recipient], _value);
+      balances[tomoDepositAddress] = balances[tomoDepositAddress].sub(_value);
+      balances[ _recipient ] = balances[_recipient].add(_value);
 
       Transfer(tomoDepositAddress, _recipient, _value);
       return true;
@@ -212,29 +317,31 @@ contract TomoCoin is SafeMath, StandardToken, Pausable {
 contract TomoContributorWhitelist is Ownable {
     mapping(address=>uint256) public whitelist;
 
-    function TomoContributorWhitelist() {}
+    function TomoContributorWhitelist() public {}
 
     event ListAddress( address _user, uint256 cap, uint _time );
 
-    function listAddress( address _user, uint256 cap ) onlyOwner {
+    function listAddress( address _user, uint256 cap ) public onlyOwner {
         whitelist[_user] = cap;
         ListAddress( _user, cap, now );
     }
 
-    function listAddresses( address[] _users, uint256[] _caps ) onlyOwner {
+    function listAddresses( address[] _users, uint256[] _caps ) public onlyOwner {
         for( uint i = 0 ; i < _users.length ; i++ ) {
             listAddress( _users[i], _caps[i] );
         }
     }
 
-    function getCap( address _user ) constant returns(uint) {
+    function getCap( address _user ) public view returns(uint) {
         return whitelist[_user];
     }
 }
 // ================= Whitelist end ====================
 
 // ================= Actual Sale Contract Start ====================
-contract TomoTokenSale is SafeMath, Pausable {
+contract TomoTokenSale is Pausable {
+  using SafeMath for uint256;
+
   TomoCoin public token;
   TomoContributorWhitelist whitelist;
 
@@ -244,8 +351,8 @@ contract TomoTokenSale is SafeMath, Pausable {
   uint256 public tokenCreationCap = 4000000 * 10**18;
   uint256 public totalSupply;
   uint256 public fundingStartTime = 1504051200; // 2017-08-30
-  uint256 public fundingPoCEndTime = 1518480000; // 2018-02-13
-  uint256 public fundingEndTime = 1518652800; // 2018-02-15
+  uint256 public fundingPoCEndTime = 1519948800; //1518480000; // 2018-02-13
+  uint256 public fundingEndTime = 1530316800; //1518652800; // 2018-02-15
   uint256 public minContribution = 0.1 ether;
   uint256 public maxContribution = 10 ether;
   uint256 public tokenExchangeRate = 4000;
@@ -260,7 +367,7 @@ contract TomoTokenSale is SafeMath, Pausable {
     TomoContributorWhitelist _tomoContributorWhitelistAddress,
     address _ethFundDepositAddress,
     address _tomoDepositAddress
-  )
+  ) public
   {
     token = TomoCoin(_tomoCoinAddress);
     whitelist = TomoContributorWhitelist(_tomoContributorWhitelistAddress);
@@ -275,7 +382,7 @@ contract TomoTokenSale is SafeMath, Pausable {
     return token.mint(to, val);
   }
 
-  function () payable {    
+  function () public payable {    
     createTokens(msg.sender, msg.value);
   }
 
@@ -286,9 +393,9 @@ contract TomoTokenSale is SafeMath, Pausable {
     require (_value <= maxContribution);
     require (!isFinalized);
 
-    uint256 tokens = safeMult(_value, tokenExchangeRate);
+    uint256 tokens = _value.mul(tokenExchangeRate);
 
-    uint256 maxCap = safeMult(maxContribution, tokenExchangeRate);
+    uint256 maxCap = maxContribution.mul(tokenExchangeRate);
     uint256 cap = whitelist.getCap(msg.sender);
     require (cap > 0);
 
@@ -298,26 +405,26 @@ contract TomoTokenSale is SafeMath, Pausable {
 
     // running while PoC Buying Time
     if (now <= fundingPoCEndTime) {
-      tokensToAllocate = safeSubtract(cap, token.balanceOf(msg.sender));
+      tokensToAllocate = cap.sub(token.balanceOf(msg.sender));
     } else {
-      tokensToAllocate = safeSubtract(maxCap, token.balanceOf(msg.sender));
+      tokensToAllocate = maxCap.sub(token.balanceOf(msg.sender));
     }
 
     // calculate refund if over max cap or individual cap
     if (tokens > tokensToAllocate) {
-      tokensToRefund = safeSubtract(tokens, tokensToAllocate);
+      tokensToRefund = tokens.sub(tokensToAllocate);
       etherToRefund = tokensToRefund / tokenExchangeRate;
     } else {
       // user can buy amount they want
       tokensToAllocate = tokens;
     }
 
-    uint256 checkedSupply = safeAdd(totalSupply, tokensToAllocate);
+    uint256 checkedSupply = totalSupply.add(tokensToAllocate);
 
     // if reaches hard cap
     if (tokenCreationCap < checkedSupply) {        
-      tokensToAllocate = safeSubtract(tokenCreationCap, totalSupply);
-      tokensToRefund   = safeSubtract(tokens, tokensToAllocate);
+      tokensToAllocate = tokenCreationCap.sub(totalSupply);
+      tokensToRefund   = tokens.sub(tokensToAllocate);
       etherToRefund = tokensToRefund / tokenExchangeRate;
       totalSupply = tokenCreationCap;
     } else {
