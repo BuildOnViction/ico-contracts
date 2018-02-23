@@ -313,13 +313,14 @@ contract TomoTokenSale is Pausable {
   address public tomoDepositAddress;
 
   uint256 public constant tokenCreationCap = 4000000 * 10**18;
-  uint256 public totalSupply = 0;
-  uint256 public constant fundingStartTime = 1519272300; // 2018-02-22 04:05:00
-  uint256 public constant fundingPoCEndTime = 1519358700; // 2018-02-23 04:05:00
-  uint256 public constant fundingEndTime = 1519531500; // 2018-02-25 04:05:00
+  uint256 public totalTokenSold = 0;
+  uint256 public constant fundingStartTime = 1519876800; // 2018/03/01 04:00:00
+  uint256 public constant fundingPoCEndTime = 1519963200; // 2018/03/02 04:00:00
+  uint256 public constant fundingEndTime = 1520136000; // 2018/03/04 04:00:00
   uint256 public constant minContribution = 0.1 ether;
   uint256 public constant maxContribution = 10 ether;
   uint256 public constant tokenExchangeRate = 4000;
+  uint256 public maxCap = maxContribution.mul(tokenExchangeRate);
 
   bool public isFinalized;
 
@@ -359,7 +360,6 @@ contract TomoTokenSale is Pausable {
 
     uint256 tokens = _value.mul(tokenExchangeRate);
 
-    uint256 maxCap = maxContribution.mul(tokenExchangeRate);
     uint256 cap = whitelist.getCap(_beneficiary);
     require (cap > 0);
 
@@ -383,16 +383,16 @@ contract TomoTokenSale is Pausable {
       tokensToAllocate = tokens;
     }
 
-    uint256 checkedSupply = totalSupply.add(tokensToAllocate);
+    uint256 checkedTokenSold = totalTokenSold.add(tokensToAllocate);
 
     // if reaches hard cap
-    if (tokenCreationCap < checkedSupply) {        
-      tokensToAllocate = tokenCreationCap.sub(totalSupply);
+    if (tokenCreationCap < checkedTokenSold) {
+      tokensToAllocate = tokenCreationCap.sub(totalTokenSold);
       tokensToRefund   = tokens.sub(tokensToAllocate);
       etherToRefund = tokensToRefund.div(tokenExchangeRate);
-      totalSupply = tokenCreationCap;
+      totalTokenSold = tokenCreationCap;
     } else {
-      totalSupply = checkedSupply;
+      totalTokenSold = checkedTokenSold;
     }
 
     // save to participated data
