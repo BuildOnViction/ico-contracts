@@ -305,7 +305,7 @@ contract TomoContributorWhitelist is Ownable {
 contract TomoTokenSale is Pausable {
   using SafeMath for uint256;
 
-  TomoCoin token;
+  TomoCoin tomo;
   TomoContributorWhitelist whitelist;
   mapping(address => uint256) public participated;
 
@@ -334,7 +334,7 @@ contract TomoTokenSale is Pausable {
     address _tomoDepositAddress
   ) public
   {
-    token = TomoCoin(_tomoCoinAddress);
+    tomo = TomoCoin(_tomoCoinAddress);
     whitelist = TomoContributorWhitelist(_tomoContributorWhitelistAddress);
     ethFundDepositAddress = _ethFundDepositAddress;
     tomoDepositAddress = _tomoDepositAddress;
@@ -344,7 +344,7 @@ contract TomoTokenSale is Pausable {
 
   function buy(address to, uint256 val) internal returns (bool success) {
     MintTomo(tomoDepositAddress, to, val);
-    return token.mint(to, val);
+    return tomo.mint(to, val);
   }
 
   function () public payable {    
